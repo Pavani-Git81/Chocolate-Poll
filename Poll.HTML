@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chocolate Poll - Share Your Sweet Preferences</title>
+    <meta name="description" content="Interactive chocolate poll with real-time results powered by Firebase Firestore.">
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&display=swap" rel="stylesheet">
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // Firebase Config - replace with your values
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+    </script>
+
+    <style>
+        /* ---------------- Your original CSS ---------------- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Creepster', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #8B4513, #D2691E, #CD853F, #DEB887);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .poll-card {
+            max-width: 42rem;
+            width: 100%;
+            background: rgba(139, 69, 19, 0.15);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(210, 180, 140, 0.3);
+            border-radius: 0.5rem;
+            box-shadow: 0 25px 50px -12px rgba(139, 69, 19, 0.4);
+            padding: 2rem;
+        }
+        .step-indicator { text-align: center; font-size: 0.875rem; font-weight: 500; color: #F5DEB3; margin-bottom: 1.5rem; font-family: 'Creepster', cursive; }
+        .poll-title { font-size: 1.875rem; font-weight: bold; text-align: center; color: #FFF8DC; margin-bottom: 2rem; text-shadow: 2px 2px 4px rgba(139, 69, 19, 0.5); font-family: 'Creepster', cursive; }
+        .poll-option { margin-bottom: 1rem; }
+        .option-button {
+            width: 100%;
+            padding: 1.5rem;
+            font-size: 1.125rem;
+            text-align: left;
+            background: rgba(245, 222, 179, 0.95);
+            border: 2px solid #D2B48C;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            color: #8B4513;
+            font-family: 'Creepster', cursive;
+        }
+        .option-button:hover { background-color: rgba(222, 184, 135, 0.95); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(139, 69, 19, 0.2); }
+        .option-button.selected { background: #8B4513; border-color: #A0522D; color: #FFF8DC; }
+        .option-button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .radio-indicator, .checkbox-indicator { width: 1.25rem; height: 1.25rem; border: 2px solid #CD853F; margin-right: 1rem; display: flex; align-items: center; justify-content: center; }
+        .radio-indicator { border-radius: 50%; }
+        .checkbox-indicator { border-radius: 0.25rem; }
+        .selected .radio-indicator { border-color: #FFF8DC; }
+        .selected .checkbox-indicator { border-color: #FFF8DC; background: rgba(255, 248, 220, 0.2); }
+        .radio-dot { width: 0.5rem; height: 0.5rem; background: #FFF8DC; border-radius: 50%; }
+        .checkbox-check { width: 0.5rem; height: 0.5rem; background: #FFF8DC; border-radius: 0.125rem; }
+        .other-input { margin-left: 2.25rem; margin-top: 0.75rem; }
+        .other-input input { width: 100%; padding: 0.75rem; border: 1px solid #D2B48C; border-radius: 0.375rem; font-size: 1rem; background: rgba(245, 222, 179, 0.9); }
+        .submit-button {
+            width: 100%;
+            margin-top: 2rem;
+            padding: 1.5rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            background: #8B4513;
+            color: #FFF8DC;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-family: 'Creepster', cursive;
+        }
+        .submit-button:hover { background: #A0522D; }
+        .submit-button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .submitted-message { text-align: center; color: #F5DEB3; margin-top: 1.5rem; font-family: 'Creepster', cursive; }
+        .results-container { min-height: 100vh; padding: 1rem; display: flex; flex-direction: column; gap: 2rem; }
+        .results-header { text-align: center; padding-top: 2rem; }
+        .results-title { font-size: 2.25rem; font-weight: bold; color: #FFF8DC; margin-bottom: 1rem; text-shadow: 2px 2px 4px rgba(139, 69, 19, 0.5); font-family: 'Creepster', cursive; }
+        .results-subtitle { display: flex; align-items: center; justify-content: center; gap: 0.5rem; color: #F5DEB3; font-family: 'Creepster', cursive; }
+        .chart-card { max-width: 42rem; width: 100%; margin: 0 auto; background: rgba(139, 69, 19, 0.15); backdrop-filter: blur(8px); border: 1px solid rgba(210, 180, 140, 0.3); border-radius: 0.5rem; box-shadow: 0 25px 50px -12px rgba(139, 69, 19, 0.4); padding: 2rem; }
+        .chart-title { font-size: 1.5rem; font-weight: bold; text-align: center; color: #FFF8DC; margin-bottom: 1.5rem; font-family: 'Creepster', cursive; }
+        .chart-total { text-align: center; font-size: 0.875rem; color: #F5DEB3; margin-bottom: 2rem; }
+        .chart-item { margin-bottom: 1.5rem; }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .chart-label { font-weight: 500; color: #FFF8DC; font-family: 'Creepster', cursive; }
+        .chart-stats { display: flex; align-items: center; gap: 0.5rem; }
+        .chart-votes { font-size: 0.875rem; color: #F5DEB3; }
+        .chart-percentage { font-size: 0.875rem; font-weight: 500; color: #FFF8DC; }
+        .progress-bar { height: 1.5rem; background: rgba(210, 180, 140, 0.3); border-radius: 0.75rem; overflow: hidden; position: relative; }
+        .progress-fill { height: 100%; transition: width 0.3s ease; position: relative; }
+        .progress-text { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 0.75rem; font-weight: 500; color: white; mix-blend-mode: difference; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <!-- ---------------- Poll HTML ---------------- -->
+    <!-- Poll 1 -->
+    <div id="poll1" class="poll-card">
+        <div class="step-indicator">Question 1 of 3</div>
+        <h2 class="poll-title">Do you like chocolate?</h2>
+        <div class="poll-options">
+            <div class="poll-option">
+                <button class="option-button" data-option="love">
+                    <div class="radio-indicator"></div>
+                    I love chocolate
+                </button>
+            </div>
+            <div class="poll-option">
+                <button class="option-button" data-option="hate">
+                    <div class="radio-indicator"></div>
+                    No I hate chocolate
+                </button>
+            </div>
+        </div>
+        <button id="submitPoll1" class="submit-button hidden">🍫 Submit Poll</button>
+        <div id="submitted1" class="submitted-message hidden">
+            ✓ Poll submitted - you cannot change your answer
+        </div>
+    </div>
+
+    <!-- Poll 2 -->
+    <div id="poll2" class="poll-card hidden">
+        <div class="step-indicator">Question 2 of 3</div>
+        <h2 class="poll-title">What type of chocolate do you like?</h2>
+        <div class="poll-options">
+            <div class="poll-option"><button class="option-button" data-option="milk"><div class="checkbox-indicator"></div>Milk chocolate</button></div>
+            <div class="poll-option"><button class="option-button" data-option="dark"><div class="checkbox-indicator"></div>Dark chocolate</button></div>
+            <div class="poll-option"><button class="option-button" data-option="white"><div class="checkbox-indicator"></div>White chocolate</button></div>
+            <div class="poll-option"><button class="option-button" data-option="caramel"><div class="checkbox-indicator"></div>Caramel chocolate</button></div>
+            <div class="poll-option">
+                <button class="option-button" data-option="other"><div class="checkbox-indicator"></div>Other</button>
+                <div id="otherInput2" class="other-input hidden"><input type="text" placeholder="Please specify..."></div>
+            </div>
+        </div>
+        <button id="submitPoll2" class="submit-button hidden">Submit Poll</button>
+        <div id="submitted2" class="submitted-message hidden">
+            ✓ Poll submitted - you cannot change your answer
+        </div>
+    </div>
+
+    <!-- Poll 3 -->
+    <div id="poll3" class="poll-card hidden">
+        <div class="step-indicator">Question 3 of 3</div>
+        <h2 class="poll-title">What is your favorite brand of chocolate?</h2>
+        <div class="poll-options">
+            <div class="poll-option"><button class="option-button" data-option="hersheys"><div class="checkbox-indicator"></div>Hershey's</button></div>
+            <div class="poll-option"><button class="option-button" data-option="reeses"><div class="checkbox-indicator"></div>Reese's</button></div>
+            <div class="poll-option"><button class="option-button" data-option="feastables"><div class="checkbox-indicator"></div>Feastables</button></div>
+            <div class="poll-option"><button class="option-button" data-option="mm"><div class="checkbox-indicator"></div>M&M</button></div>
+            <div class="poll-option"><button class="option-button" data-option="twix"><div class="checkbox-indicator"></div>Twix</button></div>
+            <div class="poll-option">
+                <button class="option-button" data-option="other"><div class="checkbox-indicator"></div>Other</button>
+                <div id="otherInput3" class="other-input hidden"><input type="text" placeholder="Please specify..."></div>
+            </div>
+        </div>
+        <button id="submitPoll3" class="submit-button hidden">View Results</button>
+        <div id="submitted3" class="submitted-message hidden">
+            ✓ Poll submitted - you cannot change your answer
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="results-container hidden">
+        <div class="results-header">
+            <h1 class="results-title">Poll Results</h1>
+            <div class="results-subtitle">🍫 Thank you for participating!</div>
+        </div>
+        <div class="chart-card">
+            <h3 class="chart-title">Do you like chocolate?</h3>
+            <div class="chart-total" id="chart1Total">Total votes: 0</div>
+            <div id="chart1"></div>
+        </div>
+        <div id="chart2Container" class="chart-card hidden">
+            <h3 class="chart-title">What type of chocolate do you like?</h3>
+            <div class="chart-total" id="chart2Total">Total votes: 0</div>
+            <div id="chart2"></div>
+        </div>
+        <div id="chart3Container" class="chart-card hidden">
+            <h3 class="chart-title">What is your favorite brand of chocolate?</h3>
+            <div class="chart-total" id="chart3Total">Total votes: 0</div>
+            <div id="chart3"></div>
+        </div>
+    </div>
+
+    <script>
+        // ---------------- Poll State ----------------
+        const userResponses = { poll1: null, poll2: [], poll3: [] };
+        const submittedPolls = new Set();
+        let currentPoll = 1;
+
+        const chartColors = {
+            1: ['#8B4513', '#D2691E'],
+            2: ['#CD853F', '#8B4513', '#F5DEB3', '#D2B48C', '#A0522D'],
+            3: ['#654321', '#8B4513', '#A0522D', '#CD853F', '#D2691E', '#DEB887']
+        };
+
+        // ---------------- Utility: Submit to Firestore ----------------
+        function submitVote(pollNumber, option, isMultiple = false) {
+            const pollRef = db.collection('polls').doc(`poll${pollNumber}`);
+            if (isMultiple) {
+                option.forEach(opt => {
+                    pollRef.update({ [opt]: firebase.firestore.FieldValue.increment(1) });
+                });
+            } else {
+                pollRef.update({ [option]: firebase.firestore.FieldValue.increment(1) });
+            }
+        }
+
+        function listenToVotes(pollNumber) {
+            const pollRef = db.collection('polls').doc(`poll${pollNumber}`);
+            pollRef.onSnapshot(doc => {
+                const data = doc.data();
+                renderChart(pollNumber, data);
+            });
+        }
+
+        function renderChart(pollNumber, data) {
+            const totalVotes = Object.values(data).reduce((sum, count) => sum + count, 0);
+            document.getElementById(`chart${pollNumber}Total`).textContent = `Total votes: ${totalVotes}`;
+            const chartContainer = document.getElementById(`chart${pollNumber}`);
+            chartContainer.innerHTML = '';
+            const colors = chartColors[pollNumber];
+
+            Object.entries(data).forEach(([key, value], index) => {
+                const percentage = totalVotes ? Math.round((value / totalVotes) * 100) : 0;
+                const label = key === 'other' ? 'Other' : key.charAt(0).toUpperCase() + key.slice(1);
+                const color = colors[index] || '#6b7280';
+                const chartItem = document.createElement('div');
+                chartItem.className = 'chart-item';
+                chartItem.innerHTML = `
+                    <div class="chart-header">
+                        <span class="chart-label">${label}</span>
+                        <div class="chart-stats">
+                            <span class="chart-votes">${value} votes</span>
+                            <span class="chart-percentage">${percentage}%</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percentage}%; background-color: ${color};">
+                            ${percentage>10?`<div class="progress-text">${percentage}%</div>`:''}
+                        </div>
+                    </div>
+                `;
+                chartContainer.appendChild(chartItem);
+            });
+        }
+
+        // ---------------- Poll Logic ----------------
+        function showPoll(pollNumber) {
+            document.querySelectorAll('[id^="poll"], #results').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`poll${pollNumber}`).classList.remove('hidden');
+            currentPoll = pollNumber;
+        }
+
+        function showResults() {
+            document.querySelectorAll('[id^="poll"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById('results').classList.remove('hidden');
+            document.body.style.alignItems = 'flex-start';
+            // Listen to Firestore votes for live updates
+            listenToVotes(1); listenToVotes(2); listenToVotes(3);
+            document.getElementById('chart2Container').classList.remove('hidden');
+            document.getElementById('chart3Container').classList.remove('hidden');
+        }
+
+        // ---------------- Event Listeners ----------------
+        // Poll 1
+        document.querySelectorAll('#poll1 .option-button').forEach(button => {
+            button.addEventListener('click', () => {
+                if (submittedPolls.has(1)) return;
+                document.querySelectorAll('#poll1 .option-button').forEach(btn => btn.classList.remove('selected'));
+                button.classList.add('selected');
+                userResponses.poll1 = button.dataset.option;
+                document.getElementById('submitPoll1').classList.remove('hidden');
+            });
+        });
+
+        document.getElementById('submitPoll1').addEventListener('click', () => {
+            if (!userResponses.poll1) return;
+            submitVote(1, userResponses.poll1);
+            submittedPolls.add(1);
+            document.getElementById('submitPoll1').classList.add('hidden');
+            document.getElementById('submitted1').classList.remove('hidden');
+            document.querySelectorAll('#poll1 .option-button').forEach(btn => btn.disabled = true);
+            setTimeout(() => userResponses.poll1 === 'hate' ? showResults() : showPoll(2), 1000);
+        });
+
+        // Poll 2
+        document.querySelectorAll('#poll2 .option-button').forEach(button => {
+            button.addEventListener('click', () => {
+                if (submittedPolls.has(2)) return;
+                const option = button.dataset.option;
+                const isSelected = userResponses.poll2.includes(option);
+                if (isSelected) {
+                    userResponses.poll2 = userResponses.poll2.filter(o => o!==option);
+                    button.classList.remove('selected');
+                    if(option==='other') document.getElementById('otherInput2').classList.add('hidden');
+                } else {
+                    userResponses.poll2.push(option);
+                    button.classList.add('selected');
+                    if(option==='other') document.getElementById('otherInput2').classList.remove('hidden');
+                }
+                document.getElementById('submitPoll2').classList.toggle('hidden', userResponses.poll2.length===0);
+            });
+        });
+
+        document.getElementById('submitPoll2').addEventListener('click', () => {
+            if(userResponses.poll2.length===0) return;
+            submitVote(2, userResponses.poll2, true);
+            submittedPolls.add(2);
+            document.getElementById('submitPoll2').classList.add('hidden');
+            document.getElementById('submitted2').classList.remove('hidden');
+            document.querySelectorAll('#poll2 .option-button').forEach(btn => btn.disabled=true);
+            setTimeout(()=>showPoll(3),1000);
+        });
+
+        // Poll 3
+        document.querySelectorAll('#poll3 .option-button').forEach(button => {
+            button.addEventListener('click', () => {
+                if(submittedPolls.has(3)) return;
+                const option = button.dataset.option;
+                const isSelected = userResponses.poll3.includes(option);
+                if(isSelected) {
+                    userResponses.poll3 = userResponses.poll3.filter(o=>o!==option);
+                    button.classList.remove('selected');
+                    if(option==='other') document.getElementById('otherInput3').classList.add('hidden');
+                } else {
+                    userResponses.poll3.push(option);
+                    button.classList.add('selected');
+                    if(option==='other') document.getElementById('otherInput3').classList.remove('hidden');
+                }
+                document.getElementById('submitPoll3').classList.toggle('hidden', userResponses.poll3.length===0);
+            });
+        });
+
+        document.getElementById('submitPoll3').addEventListener('click', () => {
+            if(userResponses.poll3.length===0) return;
+            submitVote(3, userResponses.poll3, true);
+            submittedPolls.add(3);
+            document.getElementById('submitPoll3').classList.add('hidden');
+            document.getElementById('submitted3').classList.remove('hidden');
+            document.querySelectorAll('#poll3 .option-button').forEach(btn=>btn.disabled=true);
+            setTimeout(()=>showResults(),1000);
+        });
+
+        // Start with poll 1
+        showPoll(1);
+    </script>
+</body>
+</html>
